@@ -5,6 +5,10 @@ from datetime import datetime, timedelta
 import csv
 import io
 from xhtml2pdf import pisa
+from sqlalchemy import func
+from PIL import Image
+import pytesseract
+import os
 
 main = Blueprint('main', __name__)
 
@@ -19,19 +23,15 @@ def index():
         db.session.commit()
         return redirect('/')
 
-    # Filters
-    filter_type = request.args.get('filter', 'all')
-    today = datetime.today().date()
-    if filter_type == 'week':
-        start_date = today - timedelta(days=7)
-        expenses = Expense.query.filter(Expense.date >= start_date).order_by(Expense.date.desc()).all()
-    elif filter_type == 'month':
-        start_date = today.replace(day=1)
-        expenses = Expense.query.filter(Expense.date >= start_date).order_by(Expense.date.desc()).all()
-    else:
-        expenses = Expense.query.order_by(Expense.date.desc()).all()
+    expenses = Expense.query.order_by(Expense.date.desc()).all()
+    total, top_category, avg_per_day = get_summary(expenses)
 
-    return render_template('index.html', expenses=expenses, filter_type=filter_type)
+    return render_template('index.html',
+                           expenses=expenses,
+                           filter_type='all',
+                           total=total,
+                           top_category=top_category,
+                           avg_per_day=avg_per_day)
 
 @main.route('/export')
 def export_csv():
@@ -86,17 +86,84 @@ def add_expense():
     expense = Expense(category=category, amount=amount, date=date)
     db.session.add(expense)
     db.session.commit()
+
     return jsonify({
+        'id': expense.id,
         'date': expense.date.strftime('%Y-%m-%d'),
         'category': expense.category,
         'amount': expense.amount
     })
+
+
     
-@main.route('/delete-expense/<int:id>', methods=['DELETE'])
+@main.route('/delete-expense/<int:id>', methods=['POST'])
 def delete_expense(id):
     expense = Expense.query.get_or_404(id)
     db.session.delete(expense)
     db.session.commit()
-    return jsonify({'success': True})
+    return redirect('/')
 
-#one more test comment
+
+
+def get_summary(expenses):
+    total = sum(e.amount for e in expenses)
+    category_totals = {}
+    for e in expenses:
+        category_totals[e.category] = category_totals.get(e.category, 0) + e.amount
+    top_category = max(category_totals, key=category_totals.get) if category_totals else None
+    days = len(set(e.date for e in expenses))
+    avg_per_day = round(total / days, 2) if days else 0
+    return total, top_category, avg_per_day
+
+def extract_text(image_path):
+    text = pytesseract.image_to_string(Image.open(image_path))
+    return text
+
+@main.route('/upload-receipt', methods=['POST'])
+def upload_receipt():
+    file = request.files['receipt']
+    if not file:
+        return redirect('/')
+
+    filepath = os.path.join('uploads', file.filename)
+    file.save(filepath)
+
+    text = pytesseract.image_to_string(Image.open(filepath))
+
+    category = "Misc"
+    amount = 0.0
+    date = datetime.today().strftime('%Y-%m-%d')
+
+    for line in text.splitlines():
+        if "total" in line.lower():
+            try:
+                amount = float(line.strip().split()[-1].replace('₹', '').replace('$', ''))
+            except:
+                pass
+        if "date" in line.lower():
+            try:
+                date = line.strip().split()[-1]
+            except:
+                pass
+
+    expenses = Expense.query.order_by(Expense.date.desc()).all()
+    total, top_category, avg_per_day = get_summary(expenses)
+
+    return render_template('index.html',
+                           expenses=expenses,
+                           filter_type='all',
+                           total=total,
+                           top_category=top_category,
+                           avg_per_day=avg_per_day,
+                           scanned_category=category,
+                           scanned_amount=amount,
+                           scanned_date=date)
+def get_summary(expenses):
+    total = sum(e.amount for e in expenses)
+    category_totals = {}
+    for e in expenses:
+        category_totals[e.category] = category_totals.get(e.category, 0) + e.amount
+    top_category = max(category_totals, key=category_totals.get) if category_totals else None
+    days = len(set(e.date for e in expenses))
+    avg_per_day = round(total / days, 2) if days else 0
+    return total, top_category, avg_per_day

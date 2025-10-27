@@ -6,21 +6,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    .fade-in {
-      animation: fadeIn 0.6s ease-in forwards;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-  </style>
 </head>
 <body class="bg-light">
   <div class="container py-5">
     <h1 class="mb-4 text-center">💸 Expense Tracker</h1>
 
-    <!-- Filter + Export Buttons -->
+    <!-- Summary Cards -->
+    <div class="row text-center mb-4">
+      <div class="col-md-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5>Total Spend</h5>
+            <h3>₹{{ "%.2f"|format(total) }}</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5>Top Category</h5>
+            <h3>{{ top_category or "—" }}</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5>Avg/Day</h5>
+            <h3>₹{{ "%.2f"|format(avg_per_day) }}</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters + Export -->
     <div class="mb-4 text-center">
       <a href="/?filter=all" class="btn btn-outline-secondary {% if filter_type == 'all' %}active{% endif %}">All</a>
       <a href="/?filter=week" class="btn btn-outline-secondary {% if filter_type == 'week' %}active{% endif %}">Last 7 Days</a>
@@ -29,16 +48,24 @@
       <a href="/export/pdf?filter={{ filter_type }}" class="btn btn-danger ms-2">Export PDF</a>
     </div>
 
+    <!-- Upload Receipt -->
+    <form action="/upload-receipt" method="POST" enctype="multipart/form-data" class="mb-4">
+      <div class="input-group">
+        <input type="file" name="receipt" accept="image/*" class="form-control" required>
+        <button type="submit" class="btn btn-secondary">Scan Receipt</button>
+      </div>
+    </form>
+
     <!-- Expense Form -->
-    <form id="expenseForm" class="row g-3 mb-5">
+    <form action="/" method="POST" class="row g-3 mb-5">
       <div class="col-md-4">
-        <input name="category" class="form-control" placeholder="Category" required>
+        <input name="category" class="form-control" placeholder="Category" value="{{ scanned_category or '' }}" required>
       </div>
       <div class="col-md-3">
-        <input name="amount" type="number" step="0.01" class="form-control" placeholder="Amount" required>
+        <input name="amount" type="number" step="0.01" class="form-control" placeholder="Amount" value="{{ scanned_amount or '' }}" required>
       </div>
       <div class="col-md-3">
-        <input name="date" type="date" class="form-control" required>
+        <input name="date" type="date" class="form-control" value="{{ scanned_date or '' }}" required>
       </div>
       <div class="col-md-2 d-grid">
         <button type="submit" class="btn btn-primary">Add</button>
@@ -57,13 +84,15 @@
 
     <!-- Expense List -->
     <h4>Recent Expenses</h4>
-    <ul class="list-group fade-in" id="expenseList">
+    <ul class="list-group" id="expenseList">
       {% for e in expenses %}
-        <li class="list-group-item d-flex justify-content-between align-items-center" data-id="{{ e.id }}">
+        <li class="list-group-item d-flex justify-content-between align-items-center">
           <span>{{ e.date }} – {{ e.category }}</span>
           <div>
             <strong class="me-3">₹{{ "%.2f"|format(e.amount) }}</strong>
-            <button class="btn btn-sm btn-outline-danger delete-btn">Delete</button>
+            <form action="/delete-expense/{{ e.id }}" method="POST" style="display:inline;">
+              <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+            </form>
           </div>
         </li>
       {% endfor %}
@@ -82,6 +111,10 @@
 
     const pieLabels = Object.keys(categoryTotals);
     const pieData = Object.values(categoryTotals);
+    if (pieLabels.length === 0 || pieData.length === 0) {
+      pieLabels.push("No Data");
+      pieData.push(1);
+    }
 
     const pieChart = new Chart(pieCtx, {
       type: 'pie',
@@ -94,13 +127,16 @@
       },
       options: {
         responsive: true,
-        animation: { duration: 1200, easing: 'easeOutCirc' },
         plugins: { title: { display: true, text: 'Expenses by Category' } }
       }
     });
 
     const lineLabels = [{% for e in expenses %}"{{ e.date }}",{% endfor %}];
     const lineData = [{% for e in expenses %}{{ e.amount }},{% endfor %}];
+    if (lineLabels.length === 0 || lineData.length === 0) {
+      lineLabels.push("No Data");
+      lineData.push(0);
+    }
 
     const lineChart = new Chart(lineCtx, {
       type: 'line',
@@ -116,101 +152,8 @@
       },
       options: {
         responsive: true,
-        animation: { duration: 1000, easing: 'easeInOutBack' },
         plugins: { title: { display: true, text: 'Expenses Over Time' } },
         scales: { y: { beginAtZero: true } }
-      }
-    });
-
-    // AJAX Form Submission
-    document.getElementById('expenseForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const form = e.target;
-      const data = {
-        category: form.category.value,
-        amount: form.amount.value,
-        date: form.date.value
-      };
-
-      const res = await fetch('/add-expense', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-
-      const newExpense = await res.json();
-
-      // Update list
-      const li = document.createElement('li');
-      li.className = 'list-group-item d-flex justify-content-between align-items-center fade-in';
-      li.setAttribute('data-id', newExpense.id || 'new');
-      li.innerHTML = `<span>${newExpense.date} – ${newExpense.category}</span>
-        <div>
-          <strong class="me-3">₹${parseFloat(newExpense.amount).toFixed(2)}</strong>
-          <button class="btn btn-sm btn-outline-danger delete-btn">Delete</button>
-        </div>`;
-      document.getElementById('expenseList').prepend(li);
-
-      // Update pie chart
-      const cat = newExpense.category;
-      const amt = parseFloat(newExpense.amount);
-      const catIndex = pieChart.data.labels.indexOf(cat);
-      if (catIndex >= 0) {
-        pieChart.data.datasets[0].data[catIndex] += amt;
-      } else {
-        pieChart.data.labels.push(cat);
-        pieChart.data.datasets[0].data.push(amt);
-      }
-      pieChart.update();
-
-      // Update line chart
-      lineChart.data.labels.push(newExpense.date);
-      lineChart.data.datasets[0].data.push(amt);
-      lineChart.update();
-
-      form.reset();
-    });
-
-    // AJAX Delete
-    document.getElementById('expenseList').addEventListener('click', async function(e) {
-      if (e.target.classList.contains('delete-btn')) {
-        const li = e.target.closest('li');
-        const id = li.getAttribute('data-id');
-
-        const res = await fetch(`/delete-expense/${id}`, {
-          method: 'DELETE'
-        });
-
-        const result = await res.json();
-        if (result.success) {
-          const category = li.querySelector('span').textContent.split('–')[1].trim();
-          const amount = parseFloat(li.querySelector('strong').textContent.replace('₹', ''));
-          const date = li.querySelector('span').textContent.split('–')[0].trim();
-
-          li.remove();
-
-          // Update pie chart
-          const catIndex = pieChart.data.labels.indexOf(category);
-          if (catIndex >= 0) {
-            pieChart.data.datasets[0].data[catIndex] -= amount;
-            if (pieChart.data.datasets[0].data[catIndex] <= 0) {
-              pieChart.data.labels.splice(catIndex, 1);
-              pieChart.data.datasets[0].data.splice(catIndex, 1);
-            }
-            pieChart.update();
-          }
-
-          // Update line chart
-          const dateIndex = lineChart.data.labels.indexOf(date);
-          if (dateIndex >= 0) {
-            lineChart.data.datasets[0].data[dateIndex] -= amount;
-            if (lineChart.data.datasets[0].data[dateIndex] <= 0) {
-              lineChart.data.labels.splice(dateIndex, 1);
-              lineChart.data.datasets[0].data.splice(dateIndex, 1);
-            }
-            lineChart.update();
-          }
-        }
       }
     });
   </script>

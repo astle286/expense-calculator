@@ -4,3 +4,5 @@ psycopg2-binary
 pytest
 pytest-flask
 xhtml2pdf
+pytesseract
+Pillow
