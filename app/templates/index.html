@@ -14,6 +14,14 @@
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
+    .animated-value {
+      transition: all 0.4s ease;
+    }
+    .animated-value.flash {
+      background-color: #dff0d8;
+      border-radius: 5px;
+      padding: 2px 6px;
+    }
   </style>
 </head>
 <body class="bg-light">
@@ -22,9 +30,30 @@
 
     <!-- Summary Cards -->
     <div class="row text-center mb-4">
-      <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><h5>Total Spend</h5><h3>₹{{ "%.2f"|format(total) }}</h3></div></div></div>
-      <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><h5>Top Category</h5><h3>{{ top_category or "—" }}</h3></div></div></div>
-      <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><h5>Avg/Day</h5><h3>₹{{ "%.2f"|format(avg_per_day) }}</h3></div></div></div>
+      <div class="col-md-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5>Total Spend</h5>
+            <h3 id="totalSpend" class="animated-value">₹{{ "%.2f"|format(total) }}</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5>Top Category</h5>
+            <h3 id="topCategory" class="animated-value">{{ top_category or "—" }}</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5>Avg/Day</h5>
+            <h3 id="avgPerDay" class="animated-value">₹{{ "%.2f"|format(avg_per_day) }}</h3>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Filters + Export -->
@@ -104,6 +133,23 @@
         plugins: { title: { display: true, text: 'Expenses by Category' } }
       }
     });
+    async function refreshSummaryCards() {
+  const res = await fetch('/summary');
+  const data = await res.json();
+
+  animateCardUpdate('totalSpend', `₹${data.total.toFixed(2)}`);
+  animateCardUpdate('topCategory', data.top_category || '—');
+  animateCardUpdate('avgPerDay', `₹${data.avg_per_day.toFixed(2)}`);
+}
+
+function animateCardUpdate(id, newValue) {
+  const el = document.getElementById(id);
+  if (el.innerText !== newValue) {
+    el.innerText = newValue;
+    el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 500);
+  }
+}
 
     const lineLabels = [{% for e in expenses %}"{{ e.date }}",{% endfor %}];
     const lineData = [{% for e in expenses %}{{ e.amount }},{% endfor %}];
@@ -170,9 +216,15 @@
       }
       pieChart.update();
 
+      await refreshSummaryCards();
+
+
       lineChart.data.labels.push(newExpense.date);
       lineChart.data.datasets[0].data.push(amt);
       lineChart.update();
+
+      await refreshSummaryCards();
+
 
       form.reset();
 
@@ -185,18 +237,50 @@
 
     // AJAX Delete Expense
     document.getElementById('expenseList').addEventListener('click', async function(e) {
-      if (e.target.classList.contains('delete-btn')) {
-        const li = e.target.closest('li');
-        const id = e.target.dataset.id;
+  if (e.target.classList.contains('delete-btn')) {
+    const li = e.target.closest('li');
+    const id = e.target.dataset.id;
 
-        const res = await fetch(`/delete-expense/${id}`, { method: 'POST' });
-        const result = await res.json();
+    const res = await fetch(`/delete-expense/${id}`, { method: 'POST' });
+    const result = await res.json();
 
-        if (result.success) {
-          li.remove();
+    if (result.success) {
+      // Extract values before removing
+      const amountText = li.querySelector('strong').innerText.replace('₹', '');
+      const amt = parseFloat(amountText);
+      const [dateText, categoryText] = li.querySelector('span').innerText.split('–').map(s => s.trim());
+
+      li.remove();
+
+      // Update pie chart
+      const catIndex = pieChart.data.labels.indexOf(categoryText);
+      if (catIndex >= 0) {
+        pieChart.data.datasets[0].data[catIndex] -= amt;
+        if (pieChart.data.datasets[0].data[catIndex] <= 0) {
+          pieChart.data.labels.splice(catIndex, 1);
+          pieChart.data.datasets[0].data.splice(catIndex, 1);
         }
       }
-    });
+      pieChart.update();
+
+      // Update line chart
+      const dateIndex = lineChart.data.labels.indexOf(dateText);
+      if (dateIndex >= 0) {
+        lineChart.data.labels.splice(dateIndex, 1);
+        lineChart.data.datasets[0].data.splice(dateIndex, 1);
+      }
+      lineChart.update();
+
+      await refreshSummaryCards();
+
+      const toast = document.createElement('div');
+      toast.className = 'alert alert-warning position-fixed top-0 end-0 m-3';
+      toast.innerText = 'Expense deleted!';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+  }
+});
   </script>
 </body>
 </html>

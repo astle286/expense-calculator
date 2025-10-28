@@ -107,3 +107,13 @@ def get_summary(expenses):
     days = len(set(e.date for e in expenses))
     avg_per_day = round(total / days, 2) if days else 0
     return total, top_category, avg_per_day
+
+@main.route('/summary')
+def summary():
+    expenses = Expense.query.order_by(Expense.date.desc()).all()
+    total, top_category, avg_per_day = get_summary(expenses)
+    return jsonify({
+        'total': total,
+        'top_category': top_category,
+        'avg_per_day': avg_per_day
+    })
