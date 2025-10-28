@@ -1,0 +1,13 @@
+postgres:
+  user: astle
+  password: supersecret
+  dbname: expenses
+  storage: 1Gi
+
+flask:
+  image: your-dockerhub/flask-app:latest
+  replicas: 2
+  servicePort: 80
+
+ingress:
+  host: expense.local

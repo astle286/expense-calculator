@@ -1,0 +1,4 @@
+apiVersion: v2
+name: expense-app
+description: Helm chart for Flask + PostgreSQL
+version: 0.1.0
