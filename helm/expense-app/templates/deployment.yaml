@@ -44,6 +44,16 @@ spec:
             - name: http
               containerPort: {{ .Values.service.port }}
               protocol: TCP
+          env:
+            - name: DATABASE_URL
+              value: {{ .Values.database.url | quote }}
+          startupProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.service.port }}
+            failureThreshold: 30
+            periodSeconds: 10
+
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

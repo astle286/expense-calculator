@@ -13,10 +13,10 @@ spec:
         app: flask-app
     spec:
       containers:
-      - name: flask-container
-        image: your-dockerhub-username/flask-app:latest
-        ports:
-        - containerPort: 5000
-        env:
-        - name: DATABASE_URL
-          value: "postgres://user:password@postgres-service:5432/dbname"
+        - name: flask-container
+          image: astle286/expense-app:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://astle:supersecret@expense-calculator-postgres:5432/expenses"

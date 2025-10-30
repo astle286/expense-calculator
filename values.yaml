@@ -1,13 +1,22 @@
+image:
+  repository: astle286/expense-app
+  tag: v1.1
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+service:
+  port: 5000  # Flask app's internal port
+
+ingress:
+  host: expense.127.0.0.1.nip.io
+
 postgres:
   user: astle
   password: supersecret
   dbname: expenses
   storage: 1Gi
 
-flask:
-  image: your-dockerhub/flask-app:latest
-  replicas: 2
-  servicePort: 80
+database:
+  url: postgresql://astle:supersecret@expense-calculator-postgres:5432/expenses
 
-ingress:
-  host: expense.local

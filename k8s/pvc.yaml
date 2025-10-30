@@ -7,4 +7,5 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: {{ .Values.postgres.storage }}
+      storage: 1Gi
+  storageClassName: standard
