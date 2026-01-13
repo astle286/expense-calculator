@@ -89,5 +89,3 @@ Pull requests are welcome! For major changes, please open an issue first to disc
 This project is licensed under the MIT License.  
 
 ---
-
-✨ With this README, your repo will look professional, approachable, and ready for collaboration. Would you like me to also design a **badges section** (build status, Docker pulls, Python version, etc.) to make it visually pop even more?
