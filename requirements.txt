@@ -6,3 +6,4 @@ pytest-flask
 xhtml2pdf
 pytesseract
 Pillow
+flask

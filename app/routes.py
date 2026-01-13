@@ -1,11 +1,11 @@
-from flask import Blueprint, render_template, request, redirect, send_file, render_template_string, jsonify
+from flask import Blueprint, render_template, request, send_file, render_template_string, jsonify, current_app
 from . import db
 from .models import Expense
 from datetime import datetime, timedelta
 import csv
 import io
 from xhtml2pdf import pisa
-import os
+
 
 main = Blueprint('main', __name__)
 
@@ -24,6 +24,8 @@ def index():
 
     total, top_category, avg_per_day = get_summary(expenses)
 
+    current_app.logger.info(f"Index route accessed with filter={filter_type}, total={total}, top_category={top_category}")
+
     return render_template('index.html',
                            expenses=expenses,
                            filter_type=filter_type,
@@ -41,6 +43,8 @@ def add_expense():
     db.session.add(expense)
     db.session.commit()
 
+    current_app.logger.info(f"Added expense: {expense.id}, category={category}, amount={amount}, date={date}")
+
     return jsonify({
         'id': expense.id,
         'date': expense.date.strftime('%Y-%m-%d'),
@@ -53,6 +57,9 @@ def delete_expense(id):
     expense = Expense.query.get_or_404(id)
     db.session.delete(expense)
     db.session.commit()
+
+    current_app.logger.info(f"Deleted expense: {id}")
+
     return jsonify({'success': True})
 
 @main.route('/export')
@@ -64,6 +71,9 @@ def export_csv():
     for e in expenses:
         writer.writerow([e.date, e.category, e.amount])
     output.seek(0)
+
+    current_app.logger.info(f"Exported {len(expenses)} expenses to CSV")
+
     return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='expenses.csv')
 
 @main.route('/export/pdf')
@@ -96,6 +106,9 @@ def export_pdf():
     pdf = io.BytesIO()
     pisa.CreatePDF(io.StringIO(html), dest=pdf)
     pdf.seek(0)
+
+    current_app.logger.info(f"Exported {len(expenses)} expenses to PDF with filter={filter_type}")
+
     return send_file(pdf, mimetype='application/pdf', as_attachment=True, download_name='expenses.pdf')
 
 def get_summary(expenses):
@@ -112,6 +125,9 @@ def get_summary(expenses):
 def summary():
     expenses = Expense.query.order_by(Expense.date.desc()).all()
     total, top_category, avg_per_day = get_summary(expenses)
+
+    current_app.logger.info(f"Summary requested: total={total}, top_category={top_category}, avg_per_day={avg_per_day}")
+
     return jsonify({
         'total': total,
         'top_category': top_category,
