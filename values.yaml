@@ -1,6 +1,6 @@
 image:
   repository: astle286/expense-app
-  tag: v1.1
+  tag: v1.2
   pullPolicy: IfNotPresent
 
 replicaCount: 2
