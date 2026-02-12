@@ -3,7 +3,17 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 
+# Prometheus integration
+from prometheus_flask_exporter import PrometheusMetrics
+from prometheus_client import Counter
+
 app = create_app()
+
+# Attach Prometheus metrics
+metrics = PrometheusMetrics(app)
+
+# Example custom metric: track expenses added
+expenses_added_total = Counter("expenses_added_total", "Total number of expenses added")
 
 with app.app_context():
     db.create_all()
@@ -28,4 +38,4 @@ app.logger.info("Expense Calculator app started")
 # ----------------------
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=7000, debug=False)
