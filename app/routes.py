@@ -1,12 +1,10 @@
 from flask import Blueprint, render_template, request, send_file, render_template_string, jsonify, current_app
-from . import db
+from . import db, expenses_added_total
 from .models import Expense
 from datetime import datetime, timedelta
 import csv
 import io
 from xhtml2pdf import pisa
-from prometheus_client import Counter
-from run import expenses_added_total
 
 
 main = Blueprint('main', __name__)
