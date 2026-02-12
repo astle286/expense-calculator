@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 import csv
 import io
 from xhtml2pdf import pisa
+from prometheus_client import Counter
+from run import expenses_added_total
 
 
 main = Blueprint('main', __name__)
@@ -42,6 +44,8 @@ def add_expense():
     expense = Expense(category=category, amount=amount, date=date)
     db.session.add(expense)
     db.session.commit()
+    
+    expenses_added_total.inc()
 
     current_app.logger.info(f"Added expense: {expense.id}, category={category}, amount={amount}, date={date}")
 

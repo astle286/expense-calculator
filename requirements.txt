@@ -7,3 +7,5 @@ xhtml2pdf
 pytesseract
 Pillow
 flask
+prometheus-flask-exporter
+prometheus-client
