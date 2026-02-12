@@ -9,8 +9,13 @@ services:
       - db
     environment:
       - FLASK_ENV=development
+      - SECRET_KEY=supersecretkey
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/expenses
+      - ENABLE_METRICS=true
+      - LOG_LEVEL=INFO
     volumes:
-      - ./logs:/app/logs   # <-- mount host ./logs to container /app/logs
+      - ./logs:/app/logs   # mount host ./logs to container /app/logs
+
   db:
     image: postgres:15
     environment:
